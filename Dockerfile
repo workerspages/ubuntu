@@ -1,18 +1,24 @@
 # 使用 LinuxServer 团队维护的 Ubuntu XFCE 桌面镜像作为基础
 FROM lscr.io/linuxserver/webtop:ubuntu-xfce
 
-# 设置环境变量 (可选)
-# PUID 和 PGID 用于解决容器内外文件权限问题
+# 设置环境变量，配置中文本地化、时区及权限参数
 ENV PUID=1000
 ENV PGID=1000
-# 设置时区
 ENV TZ=Asia/Shanghai
-# 禁用基本的 HTTP 认证（如果部署在公网，建议设为 true 并通过环境变量设置密码）
-ENV DOCKER_MODS=linuxserver/mods:webtop-vnc-password-auth
+ENV LANG=zh_CN.UTF-8
+ENV LANGUAGE=zh_CN:zh
+ENV LC_ALL=zh_CN.UTF-8
 
-# 更新软件源并安装您个人需要的工具（例如用来同步备份几百GB数据的 rclone，以及基础工具）
+ENV CUSTOM_USER="admin"
+ENV CUSTOM_PASSWORD="admin"
+
+# 更新软件源并安装中文语言包、中文字体以及您的常用工具
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        language-pack-zh-hans \
+        fonts-wqy-zenhei \
+        fonts-wqy-microhei \
+        fonts-noto-cjk \
         curl \
         wget \
         vim \
@@ -20,6 +26,9 @@ RUN apt-get update && \
         unzip \
         tar \
         rclone && \
+    # 生成并应用中文 locale
+    locale-gen zh_CN.UTF-8 && \
+    update-locale LANG=zh_CN.UTF-8 && \
     # 清理 APT 缓存，减少最终镜像的大小
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
