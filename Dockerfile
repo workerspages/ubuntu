@@ -10,12 +10,13 @@ ENV TZ=Asia/Shanghai
 ENV USER=root
 
 # 安装轻量级桌面环境 (XFCE4)、VNC 服务及相关组件、noVNC (Web代理)、以及常用工具
+# 注意：添加了 tigervnc-tools 以提供 vncpasswd 命令
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         xfce4 \
         xfce4-terminal \
         tigervnc-standalone-server \
-        tigervnc-common \
+        tigervnc-tools \
         novnc \
         websockify \
         curl \
@@ -41,8 +42,8 @@ RUN mkdir -p ~/.vnc && \
     echo "password" | vncpasswd -f > ~/.vnc/passwd && \
     chmod 600 ~/.vnc/passwd
 
-# 配置 VNC 启动脚本，确保连接时加载 XFCE4 桌面环境
-RUN echo "startxfce4" > ~/.vnc/xstartup && \
+# 配置 VNC 启动脚本，确保连接时正确加载 XFCE4 桌面环境
+RUN echo "#!/bin/sh\nstartxfce4" > ~/.vnc/xstartup && \
     chmod +x ~/.vnc/xstartup
 
 # 创建并设置工作目录
