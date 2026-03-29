@@ -29,7 +29,7 @@
 在部署到云平台（如 Zeabur）时，请务必在服务的“环境变量 (Variables)”设置中添加以下参数，以确保系统的安全与正常访问：
 
 * `CUSTOM_USER`: 设置您的自定义登录用户名（如 `admin`）
-* `WEBTOP_PASSWORD`: 设置您的专属高强度登录密码
+* `WEBTOP_PASSWORD`: 设置您的专属高强度登录密码（如 `admin`）
 
 ### 2. 网络端口设置
 
@@ -47,8 +47,8 @@ docker build -t my-cloud-desktop .
 docker run -d \
   --name ubuntu-desktop \
   -p 3000:3000 \
-  -e CUSTOM_USER="your_username" \
-  -e WEBTOP_PASSWORD="your_secure_password" \
+  -e CUSTOM_USER="admin" \
+  -e WEBTOP_PASSWORD="admin" \
   my-cloud-desktop
 ```
 运行后，在浏览器访问 `http://localhost:3000` 即可进入桌面。
