@@ -16,13 +16,14 @@ ENV CUSTOM_USER="your_username"
 # 请将 your_secure_password 修改为您想要的密码
 ENV WEBTOP_PASSWORD="your_secure_password"
 
-# 更新软件源并安装中文语言包、中文字体以及您的常用工具
+# 更新软件源并安装中文语言包、中文字体、浏览器中文包以及您的常用工具
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
         fonts-wqy-zenhei \
         fonts-wqy-microhei \
         fonts-noto-cjk \
+        chromium-browser-l10n \
         curl \
         wget \
         vim \
