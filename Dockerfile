@@ -9,12 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
 ENV USER=root
 
-# 安装轻量级桌面环境 (XFCE4)、VNC 服务、noVNC (Web代理)、以及常用工具
+# 安装轻量级桌面环境 (XFCE4)、VNC 服务及相关组件、noVNC (Web代理)、以及常用工具
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         xfce4 \
         xfce4-terminal \
         tigervnc-standalone-server \
+        tigervnc-common \
         novnc \
         websockify \
         curl \
@@ -40,14 +41,17 @@ RUN mkdir -p ~/.vnc && \
     echo "password" | vncpasswd -f > ~/.vnc/passwd && \
     chmod 600 ~/.vnc/passwd
 
+# 配置 VNC 启动脚本，确保连接时加载 XFCE4 桌面环境
+RUN echo "startxfce4" > ~/.vnc/xstartup && \
+    chmod +x ~/.vnc/xstartup
+
 # 创建并设置工作目录
 WORKDIR /workspace
 
 # 暴露 8080 端口供浏览器访问
 EXPOSE 8080
 
-# 容器启动命令：
+# 容器启动命令：使用 Docker 推荐的 JSON 数组格式
 # 1. 启动 VNC 服务器，设置分辨率为 1280x720 (运行在 :1 也就是 5901 端口)
 # 2. 启动 websockify (noVNC)，将 5901 的 VNC 画面代理到 8080 端口供网页访问
-CMD vncserver :1 -geometry 1280x720 -depth 24 && \
-    websockify --web=/usr/share/novnc/ 8080 localhost:5901
+CMD ["/bin/sh", "-c", "vncserver :1 -geometry 1280x720 -depth 24 && websockify --web=/usr/share/novnc/ 8080 localhost:5901"]
