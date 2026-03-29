@@ -1,20 +1,15 @@
 
-# Ubuntu Docker 镜像 (PaaS 部署专用)
+# 云端 Ubuntu 桌面环境 (PaaS 部署专用)
 
-这是一个基于官方 Ubuntu 22.04 LTS 构建的自定义 Docker 镜像项目。该镜像通过 GitHub Actions 自动构建，并推送到 GitHub 容器注册表 (GHCR)。为了完美适配各种 PaaS（平台即服务，如 Render, Railway, Fly.io 等）的部署需求，容器内置了一个轻量级的 Python HTTP 服务以保持持续运行。
+这是一个基于 `lscr.io/linuxserver/webtop:ubuntu-xfce` 构建的云端纯正 Ubuntu 桌面工作站。本项目针对现代 PaaS 平台（如 Zeabur、Railway 等）进行了深度优化，解决了环境变量冲突与语言本地化问题，让您只需一个浏览器，即可随时随地访问拥有完整图形界面的 Linux 桌面。
 
-## 🌟 特性
+## 🌟 核心特性
 
-* **基础镜像**: 官方 Ubuntu 22.04 LTS
-* **自动构建**: 配置了 GitHub Actions 工作流，当代码推送到 `main` 分支时，会自动触发构建并发布到 GHCR。
-* **PaaS 友好**: 默认启动基于 Python 3 的简易 HTTP 服务器 (监听 8080 端口)，防止容器在 PaaS 平台上因缺少常驻后台进程而不断重启。
-* **预装工具**: 包含了常用的基础工具集，方便直接在云端控制台进入终端进行调试和开发：
-  * `curl`, `wget` (网络请求)
-  * `vim` (文本编辑)
-  * `git` (代码与版本控制)
-  * `unzip`, `tar` (文件压缩与解压)
-  * `python3`, `python3-pip` (Python 运行环境及包管理)
-* **环境优化**: 默认配置为 `Asia/Shanghai` 时区，并设置了非交互式构建 (`DEBIAN_FRONTEND=noninteractive`) 以加速和稳定构建过程。
+* **开箱即用的 Web 桌面**: 采用先进的 KasmVNC 技术，无需安装任何客户端，通过浏览器即可获得极其流畅的桌面操作体验，支持剪贴板双向同步。
+* **完美的纯中文环境**: 系统底层已深度集成简体中文语言包 (`language-pack-zh-hans`)、文泉驿/Noto 等开源中文字体，并将 Chromium 浏览器的界面彻底中文化，告别乱码和英文界面。
+* **PaaS 平台防冲突机制**: 独创的环境变量代理启动方式。通过自定义 `WEBTOP_PASSWORD` 变量传递密码，完美避开各大 PaaS 平台自动注入 `PASSWORD` 变量导致的登录覆盖和失效问题。
+* **海量数据同步利器**: 预装了强大的 `rclone` 工具，非常适合在云端直接挂载各大网盘。无论是处理高达几百GB的大型备份任务，还是管理类似 iPhone 备份、WeChat_BackupFiles 微信记录、以及庞大的影视资源库，都能在云端高速且稳定地完成流转。
+* **基础工具链**: 预置了 `curl`, `wget`, `vim`, `git`, `unzip`, `tar` 等常用命令行工具，方便随时打开终端进行调试。
 
 ## 📂 项目结构
 
@@ -22,48 +17,50 @@
 .
 ├── .github/
 │   └── workflows/
-│       └── docker-build.yml  # GitHub Actions 自动化构建和推送的配置文件
-├── Dockerfile                # Docker 镜像构建指令及环境配置
+│       └── docker-build.yml  # GitHub Actions 自动化构建和推送配置
+├── Dockerfile                # 核心镜像构建指令及环境变量配置
 └── README.md                 # 项目说明文档 (本文档)
 ```
 
-## 🚀 如何使用
+## 🚀 部署与使用指南
 
-### 1. 本地构建与运行测试
+### 1. 环境变量配置
 
-如果您想在本地测试此镜像，请确保已安装 Docker，然后在项目根目录下打开终端运行：
+在部署到云平台（如 Zeabur）时，请务必在服务的“环境变量 (Variables)”设置中添加以下参数，以确保系统的安全与正常访问：
 
-```bash
-# 构建 Docker 镜像
-docker build -t ubuntu-paas-env .
+* `CUSTOM_USER`: 设置您的自定义登录用户名（如 `admin`）
+* `WEBTOP_PASSWORD`: 设置您的专属高强度登录密码
 
-# 运行容器并将容器内的 8080 端口映射到本机的 8080 端口
-docker run -p 8080:8080 ubuntu-paas-env
-```
-随后，打开浏览器访问 `http://localhost:8080`，您将看到 "Hello from Ubuntu Container on PaaS!" 的欢迎信息，证明服务运行正常。
+### 2. 网络端口设置
 
-### 2. 从 GHCR 拉取云端镜像
+本镜像底层的 Webtop 默认通过 **`3000`** 端口提供 Web 服务。请确保在 PaaS 平台的网络配置中，将对外暴露的域名路由指向容器内部的 `3000` 端口。
 
-GitHub Actions 会自动将构建好的镜像发布到您 GitHub 账号的 Packages (GHCR) 中。您可以在任何机器上通过以下命令直接拉取（**注意：请将 `YOUR_USERNAME/YOUR_REPO` 替换为您实际的 GitHub 用户名和仓库名**）：
+### 3. 本地快速测试
+
+如果您已在本地安装了 Docker，可以通过以下命令直接拉取构建并运行测试：
 
 ```bash
-docker pull ghcr.io/YOUR_USERNAME/YOUR_REPO:latest
+# 构建镜像
+docker build -t my-cloud-desktop .
+
+# 运行容器 (请将用户名和密码替换为您自己的)
+docker run -d \
+  --name ubuntu-desktop \
+  -p 3000:3000 \
+  -e CUSTOM_USER="your_username" \
+  -e WEBTOP_PASSWORD="your_secure_password" \
+  my-cloud-desktop
 ```
+运行后，在浏览器访问 `http://localhost:3000` 即可进入桌面。
 
-### 3. 在 PaaS 平台部署
+## 🛠️ 云端容器的“无状态”特性与软件安装
 
-绝大多数现代云端 PaaS 平台（如 Railway, Render, Koyeb, Fly.io 等）都完美支持此项目。您可以选择以下两种主流方式之一进行部署：
+本系统是一个标准且完整的 Ubuntu 环境。您可以在桌面的终端中使用 `sudo apt update` 和 `sudo apt install` 随意安装任何 Linux 软件（如代码编辑器、网络工具等）。
 
-* **源码关联部署 (推荐)**: 在 PaaS 平台后台新建服务，授权访问您的 GitHub 仓库。平台会自动读取仓库根目录的 `Dockerfile` 进行云端构建和自动部署。
-* **镜像直接部署**: 在 PaaS 平台上选择 "从 Docker Registry 部署"，输入您的 GHCR 镜像地址（如 `ghcr.io/YOUR_USERNAME/YOUR_REPO:latest`）即可。
-* **端口配置提示**: 无论使用哪种方式，请确保在 PaaS 的服务网络设置中，将外部访问端口指向容器内部暴露的 `8080` 端口。
+**⚠️ 重要提示：**
+PaaS 平台上的 Docker 容器是**无状态（Ephemeral）**的。当容器重启或平台重新部署时，您通过终端手动安装的软件将会丢失，系统会恢复到 `Dockerfile` 定义的初始状态。
 
-## 🛠️ 如何定制化修改
-
-您可以完全根据自己的实际业务需求修改根目录下的 `Dockerfile`：
-* **安装其他软件**: 在 `RUN apt-get install` 命令行后面追加您需要的 Ubuntu 软件包名称（例如 `nodejs`, `npm`, `openjdk-17-jdk` 等）。
-* **修改默认运行服务**: 如果您想运行自己的 Node.js 应用、Java Spring Boot 或其他 Web 框架，请替换掉 `Dockerfile` 末尾的 `CMD ["python3", "-m", "http.server", "8080"]` 指令，并根据应用实际情况修改 `EXPOSE` 暴露的端口号。
+**最佳实践**：如果您需要某款软件（例如特定版本的 Node.js 或 Python 环境）永久驻留在系统中，请将该软件的安装命令直接补充到本项目根目录的 `Dockerfile` 的 `RUN apt-get install` 列表中，并推送到 GitHub。自动化流水线会为您构建一个包含该软件的全新永久镜像。
 
 ---
-*此项目由 GitHub Actions 驱动 CI/CD 自动化构建*
-
+*Powered by Docker, LinuxServer Webtop & GitHub Actions*
