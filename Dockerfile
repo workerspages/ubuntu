@@ -10,20 +10,20 @@ ENV LANGUAGE=zh_CN:zh
 ENV LC_ALL=zh_CN.UTF-8
 
 # 设置自定义的登录账号
-ENV CUSTOM_USER="your_username"
+ENV CUSTOM_USER="admin"
 
 # 使用自定义变量名来设置密码，完美避开 PaaS 平台的 PASSWORD 变量冲突
 # 请将 your_secure_password 修改为您想要的密码
-ENV WEBTOP_PASSWORD="your_secure_password"
+ENV WEBTOP_PASSWORD="admin"
 
-# 更新软件源并安装中文语言包、中文字体、浏览器中文包以及您的常用工具
+# 更新软件源并安装中文语言包、中文字体以及您的常用工具
+# ⚠️ 注意：已移除会导致 Snap 崩溃的 chromium-browser-l10n
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
         fonts-wqy-zenhei \
         fonts-wqy-microhei \
         fonts-noto-cjk \
-        chromium-browser-l10n \
         curl \
         wget \
         vim \
@@ -46,5 +46,4 @@ EXPOSE 3000
 
 # 核心魔法：覆盖默认的启动入口
 # 在启动 S6-overlay (/init) 之前，将我们的 WEBTOP_PASSWORD 赋值给 PASSWORD
-# 这样既满足了底层脚本的强依赖，又不会和 PaaS 平台的全局变量打架
 ENTRYPOINT ["/bin/bash", "-c", "export PASSWORD=$WEBTOP_PASSWORD && exec /init"]
