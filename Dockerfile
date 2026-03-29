@@ -9,8 +9,12 @@ ENV LANG=zh_CN.UTF-8
 ENV LANGUAGE=zh_CN:zh
 ENV LC_ALL=zh_CN.UTF-8
 
-ENV CUSTOM_USER="admin"
-ENV CUSTOM_PASSWORD="admin"
+# 设置自定义的登录账号
+ENV CUSTOM_USER="your_username"
+
+# 使用自定义变量名来设置密码，完美避开 PaaS 平台的 PASSWORD 变量冲突
+# 请将 your_secure_password 修改为您想要的密码
+ENV WEBTOP_PASSWORD="your_secure_password"
 
 # 更新软件源并安装中文语言包、中文字体以及您的常用工具
 RUN apt-get update && \
@@ -38,3 +42,8 @@ WORKDIR /workspace
 
 # Webtop 默认通过 3000 端口提供流畅的网页版桌面访问
 EXPOSE 3000
+
+# 核心魔法：覆盖默认的启动入口
+# 在启动 S6-overlay (/init) 之前，将我们的 WEBTOP_PASSWORD 赋值给 PASSWORD
+# 这样既满足了底层脚本的强依赖，又不会和 PaaS 平台的全局变量打架
+ENTRYPOINT ["/bin/bash", "-c", "export PASSWORD=$WEBTOP_PASSWORD && exec /init"]
