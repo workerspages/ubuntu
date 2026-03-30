@@ -2,11 +2,7 @@ version: '3.8'
 
 services:
   ubuntu-desktop:
-    # 如果您已经将镜像推送到 Docker Hub 或 GHCR，请替换为您的镜像地址
-    # 例如: image: ghcr.io/您的用户名/ubuntu-oss:latest
-    # 如果您在本地包含 Dockerfile 的目录运行，请取消注释下一行的 build 并注释掉 image
-    build: .
-    image: my-ubuntu-desktop:latest
+    image: ghcr.io/workerspages/ubuntu:latest
     container_name: ubuntu-webtop
     restart: unless-stopped
     ports:
