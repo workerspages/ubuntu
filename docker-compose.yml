@@ -5,6 +5,11 @@ services:
     image: ghcr.io/workerspages/ubuntu:latest
     container_name: ubuntu-webtop
     restart: unless-stopped
+    
+    # 核心安全配置：给容器 60 秒的优雅停机时间。
+    # 收到关闭指令后，允许脚本最多运行 60 秒来打包上传数据，超时才会强制拔电源。
+    stop_grace_period: 60s
+    
     ports:
       # 将容器内的 6901 端口映射到宿主机，左侧端口可按需修改
       - "6901:6901"
