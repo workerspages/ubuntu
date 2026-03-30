@@ -15,7 +15,7 @@ ENV CUSTOM_USER="admin"
 ENV CUSTOM_PASSWORD="你的复杂密码"
 
 # 更新软件源并安装中文语言包、字体以及核心工具 
-# (包含 socat 工具，用于实现 8080 端口映射)
+# (已移除 socat，恢复使用原生端口以保障 WebSocket 稳定)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
@@ -28,8 +28,7 @@ RUN apt-get update && \
         git \
         unzip \
         tar \
-        rclone \
-        socat && \
+        rclone && \
     # 生成并应用中文 locale
     locale-gen zh_CN.UTF-8 && \
     update-locale LANG=zh_CN.UTF-8 && \
@@ -40,8 +39,8 @@ RUN apt-get update && \
 # 设置工作目录
 WORKDIR /workspace
 
-# 对外暴露服务端端口
-EXPOSE 8080
+# 恢复使用默认的 3000 端口，这对 WebSocket 长连接最稳定
+EXPOSE 3000
 
 # 核心魔法：生成启动与 S3/WebDAV 自动同步脚本
 RUN { \
@@ -95,19 +94,16 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
+    echo '# 定义需要排除的系统核心缓存和运行时文件 (极度重要，防止黑屏和 WS 断开)'; \
+    echo 'EXCLUDES="--exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.config/pulse/** --exclude=/.config/kasmvnc.yaml --exclude=/.local/state/**"'; \
+    echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
-    echo '    echo "初始化检测远端目录是否存 (避免首次运行报错)..."'; \
+    echo '    echo "初始化检测远端目录是否存在 (避免首次运行报错)..."'; \
     echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
     echo '    '; \
-    echo '    echo "正在从 $TARGET_REMOTE 恢复数据到 /config..."'; \
-    echo '    # 增加 --exclude 防止拉取没用的缓存和桌面锁文件'; \
-    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" \'; \
-    echo '        --exclude ".cache/**" \'; \
-    echo '        --exclude ".vnc/*.pid" \'; \
-    echo '        --exclude ".vnc/*.log" \'; \
-    echo '        --exclude ".X*-lock" \'; \
-    echo '        --ignore-errors'; \
+    echo '    echo "正在从 $TARGET_REMOTE 恢复核心配置数据到 /config..."'; \
+    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" $EXCLUDES --ignore-errors'; \
     echo '    '; \
     echo '    # 4. 启动后台守护进程，执行自动同步'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
@@ -115,37 +111,21 @@ RUN { \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
     echo '            echo "[$(date)] 开始后台自动同步 /config 到 $TARGET_REMOTE..."'; \
-    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" \'; \
-    echo '                --exclude ".cache/**" \'; \
-    echo '                --exclude ".vnc/*.pid" \'; \
-    echo '                --exclude ".vnc/*.log" \'; \
-    echo '                --exclude ".X*-lock" \'; \
-    echo '                --ignore-errors > /dev/null 2>&1'; \
+    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" $EXCLUDES --ignore-errors > /dev/null 2>&1'; \
     echo '        done'; \
     echo '    ) &'; \
     echo 'else'; \
     echo '    echo "⚠️ 未配置有效的 STORAGE_TYPE (s3/webdav)，跳过数据恢复与自动同步。"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# ================== 核心修复逻辑 =================='; \
-    echo 'echo "清理可能导致桌面启动失败的临时锁文件和缓存..."'; \
-    echo 'rm -rf /config/.vnc/*.pid /config/.vnc/*.log /config/.X*-lock /config/.X11-unix /config/.cache /config/.dbus /tmp/.X11-unix'; \
-    echo ''; \
-    echo 'echo "修复 /config 与系统目录权限..."'; \
+    echo '# 权限修复兜底，防止残留文件导致权限错乱'; \
     echo 'chown -R $PUID:$PGID /config'; \
-    echo 'mkdir -p /tmp/.X11-unix'; \
-    echo 'chmod 1777 /tmp/.X11-unix'; \
-    echo 'chmod 1777 /tmp'; \
-    echo '# =================================================='; \
+    echo 'rm -rf /config/.vnc/*.pid /config/.X*-lock /tmp/.X11-unix 2>/dev/null'; \
     echo ''; \
     echo '# 将我们的 CUSTOM_PASSWORD 赋值给 webtop 默认识别的 PASSWORD'; \
     echo 'export PASSWORD=$CUSTOM_PASSWORD'; \
     echo ''; \
-    echo '# 5. 端口转发 (利用 socat 将基础镜像内定的 3000 端口转发至约定的 8080 端口)'; \
-    echo 'echo "启动 8080 端口映射服务..."'; \
-    echo 'socat TCP-LISTEN:8080,fork,reuseaddr TCP:127.0.0.1:3000 &'; \
-    echo ''; \
-    echo '# 6. 接管并启动 webtop 默认环境主程序'; \
+    echo '# 5. 接管并启动 webtop 默认环境主程序 (不再使用 socat 转发)'; \
     echo 'echo "拉起 Ubuntu Web 桌面..."'; \
     echo 'exec /init'; \
 } > /sync-and-start.sh && chmod +x /sync-and-start.sh
