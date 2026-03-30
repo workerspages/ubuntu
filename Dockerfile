@@ -4,7 +4,7 @@ FROM accetto/ubuntu-vnc-xfce-firefox-g3:latest
 # 切换到 root 用户以安装必要的系统环境和工具
 USER 0
 
-# 安装中文语言包、中文字体以及 rclone (curl, wget, vim, unzip, firefox 等均已内置)
+# 安装中文语言包、中文字体以及 rclone
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
@@ -18,6 +18,12 @@ RUN apt-get update && \
     # 清理 APT 缓存，减少最终镜像的体积
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# 针对部分 PaaS 平台强制以随机无权限 UID 运行容器的严格安全策略
+# 提前赋予主目录和 /tmp 目录最高读写权限，彻底防止 rclone 写入失败
+RUN chmod 777 /tmp && \
+    mkdir -p /home/headless/.config && \
+    chmod -R 777 /home/headless
 
 # 设置环境变量，配置中文本地化及桌面参数
 ENV TZ=Asia/Shanghai
@@ -39,10 +45,11 @@ RUN { \
     echo '# accetto 镜像的用户数据统一位于 /home/headless'; \
     echo 'HOME_DIR="/home/headless"'; \
     echo ''; \
-    echo '# 1. 动态生成 Rclone 配置文件'; \
-    echo 'mkdir -p $HOME_DIR/.config/rclone'; \
-    echo 'CONF_FILE="$HOME_DIR/.config/rclone/rclone.conf"'; \
-    echo '> "$CONF_FILE"'; \
+    echo '# 1. 动态生成 Rclone 配置文件 (放置在 /tmp 目录，彻底规避 PaaS 权限限制)'; \
+    echo 'CONF_FILE="/tmp/rclone.conf"'; \
+    echo 'rm -f "$CONF_FILE"'; \
+    echo 'touch "$CONF_FILE"'; \
+    echo 'chmod 666 "$CONF_FILE" 2>/dev/null || true'; \
     echo ''; \
     echo 'BASE_REMOTE=""'; \
     echo ''; \
