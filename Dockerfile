@@ -19,7 +19,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 针对部分 PaaS 平台强制以随机无权限 UID 运行容器的严格安全策略
 # 提前赋予主目录最高读写权限，并移交所有权 (UID 1001)，彻底防止 rclone 写入或修改时间戳失败
 RUN chmod 777 /tmp && \
     mkdir -p /home/headless/.config && \
@@ -34,7 +33,7 @@ ENV LC_ALL=zh_CN.UTF-8
 
 # accetto 镜像默认使用 VNC_PW 控制桌面密码
 ENV VNC_PW="你的复杂密码"
-# 兼容您之前在 PaaS 平台上设定的自定义密码变量名
+# 兼容您在 PaaS 平台上设定的自定义密码变量名
 ENV CUSTOM_PASSWORD="你的复杂密码"
 
 # 核心魔法：生成启动与 S3/WebDAV 自动同步脚本
@@ -46,7 +45,7 @@ RUN { \
     echo '# accetto 镜像的用户数据统一位于 /home/headless'; \
     echo 'HOME_DIR="/home/headless"'; \
     echo ''; \
-    echo '# 1. 动态生成 Rclone 配置文件 (放置在 /tmp 目录，彻底规避 PaaS 权限限制)'; \
+    echo '# 1. 动态生成 Rclone 配置文件 (放置在 /tmp 目录，规避 PaaS 权限限制)'; \
     echo 'CONF_FILE="/tmp/rclone.conf"'; \
     echo 'rm -f "$CONF_FILE"'; \
     echo 'touch "$CONF_FILE"'; \
@@ -93,7 +92,7 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 定义 Rclone 核心参数 (加入 -L 处理软链接，并排除系统核心缓存防止破坏桌面环境)'; \
+    echo '# 定义 Rclone 核心参数 (-L 处理软链接，并排除系统核心缓存防止破坏桌面环境)'; \
     echo 'RCLONE_OPTS="-L --exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
     echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
@@ -105,8 +104,8 @@ RUN { \
     echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors'; \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 恢复数据完毕。"'; \
     echo '    '; \
-    echo '    # 4. 启动后台守护进程，执行自动同步'; \
-    echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
+    echo '    # 4. 启动后台守护进程，执行自动同步 (间隔缩短为 2 分钟)'; \
+    echo '    INTERVAL=${SYNC_INTERVAL:-2}'; \
     echo '    ('; \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
@@ -127,9 +126,34 @@ RUN { \
     echo '    export VNC_PW=$CUSTOM_PASSWORD'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 5. 接管并启动 accetto 默认桌面环境主程序'; \
+    echo '# ========================================================================='; \
+    echo '# 5. 启动桌面主程序并启用【优雅停机与数据安全保护机制】'; \
+    echo '# ========================================================================='; \
     echo 'echo "拉起 Ubuntu Web 桌面..."'; \
-    echo 'exec /dockerstartup/startup.sh "$@"'; \
+    echo '/dockerstartup/startup.sh "$@" &'; \
+    echo 'VNC_PID=$!'; \
+    echo ''; \
+    echo '# 拦截 PaaS 平台的强行关闭信号，执行安全的关机序列与最终强制同步'; \
+    echo 'shutdown_handler() {'; \
+    echo '    echo "=================================================="'; \
+    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ⚠️ 收到容器关闭/重启信号！"'; \
+    echo '    echo "第一步: 安全关闭桌面与浏览器，强制将内存书签与缓存写入磁盘..."'; \
+    echo '    kill -TERM $VNC_PID 2>/dev/null'; \
+    echo '    wait $VNC_PID'; \
+    echo '    '; \
+    echo '    echo "第二步: 执行最终强制数据同步，将最新状态毫无遗漏地推送到网盘..."'; \
+    echo '    if [ -n "$TARGET_REMOTE" ]; then'; \
+    echo '        rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors'; \
+    echo '    fi'; \
+    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ✅ 最终同步完美完成，数据绝对安全，容器允许退出。"'; \
+    echo '    echo "=================================================="'; \
+    echo '    exit 0'; \
+    echo '}'; \
+    echo 'trap "shutdown_handler" SIGTERM SIGINT'; \
+    echo ''; \
+    echo '# 挂起主进程，随时等待并响应退出信号'; \
+    echo 'wait $VNC_PID'; \
+    echo 'shutdown_handler'; \
 } > /sync-and-start.sh && chmod +x /sync-and-start.sh
 
 # 切换回 accetto 镜像内定的普通安全用户 (headless)
