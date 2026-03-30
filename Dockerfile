@@ -20,9 +20,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 针对部分 PaaS 平台强制以随机无权限 UID 运行容器的严格安全策略
-# 提前赋予主目录和 /tmp 目录最高读写权限，彻底防止 rclone 写入失败
+# 提前赋予主目录最高读写权限，并移交所有权 (UID 1001)，彻底防止 rclone 写入或修改时间戳失败
 RUN chmod 777 /tmp && \
     mkdir -p /home/headless/.config && \
+    chown -R 1001:0 /home/headless && \
     chmod -R 777 /home/headless
 
 # 设置环境变量，配置中文本地化及桌面参数
@@ -92,8 +93,8 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 定义需要排除的系统核心缓存和运行时文件 (防止破坏桌面环境)'; \
-    echo 'EXCLUDES="--exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
+    echo '# 定义 Rclone 核心参数 (加入 -L 处理软链接，并排除系统核心缓存防止破坏桌面环境)'; \
+    echo 'RCLONE_OPTS="-L --exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
     echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
@@ -101,7 +102,7 @@ RUN { \
     echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
     echo '    '; \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 正在从 $TARGET_REMOTE 恢复核心配置数据到 $HOME_DIR..."'; \
-    echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $EXCLUDES --ignore-errors'; \
+    echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors'; \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 恢复数据完毕。"'; \
     echo '    '; \
     echo '    # 4. 启动后台守护进程，执行自动同步'; \
@@ -110,7 +111,7 @@ RUN { \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
     echo '            echo "[$(date "+%Y-%m-%d %H:%M:%S")] 开始后台自动同步 $HOME_DIR 到 $TARGET_REMOTE..."'; \
-    echo '            rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $EXCLUDES --ignore-errors > /dev/null 2>&1'; \
+    echo '            rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors > /dev/null 2>&1'; \
     echo '            echo "[$(date "+%Y-%m-%d %H:%M:%S")] 同步完成。"'; \
     echo '        done'; \
     echo '    ) &'; \
