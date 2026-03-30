@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  ubuntu-desktop:
+    # 如果您已经将镜像推送到 Docker Hub 或 GHCR，请替换为您的镜像地址
+    # 例如: image: ghcr.io/您的用户名/ubuntu-oss:latest
+    # 如果您在本地包含 Dockerfile 的目录运行，请取消注释下一行的 build 并注释掉 image
+    build: .
+    image: my-ubuntu-desktop:latest
+    container_name: ubuntu-webtop
+    restart: unless-stopped
+    ports:
+      # 将容器内的 6901 端口映射到宿主机，左侧端口可按需修改
+      - "6901:6901"
+    environment:
+      # ---------------- 基础设置 ----------------
+      - CUSTOM_PASSWORD=您的复杂登录密码
+      # 存储类型: 填写 s3 或 webdav
+      - STORAGE_TYPE=webdav
+      # 同步间隔时长（单位：分钟，默认 5）
+      - SYNC_INTERVAL=5
+      
+      # ---------------- 加密设置 (强烈推荐) ----------------
+      # 设置后会自动开启 AES-256 加密。请务必牢记，丢失将无法解密！
+      - ENCRYPT_PASSWORD=您的超强加密密码
+      - ENCRYPT_SALT=您的加密盐值
+      
+      # ---------------- WebDAV 配置 ----------------
+      # 如果 STORAGE_TYPE=webdav，请填写以下信息：
+      - WEBDAV_URL=https://您的网盘地址/dav
+      - WEBDAV_USER=您的网盘用户名
+      - WEBDAV_PASS=您的网盘密码
+      - WEBDAV_VENDOR=other # 可选: nextcloud, owncloud, other
+      - WEBDAV_PATH=ubuntu-backup # 网盘中存放数据的文件夹名称
+
+      # ---------------- S3 配置 ----------------
+      # 如果 STORAGE_TYPE=s3，请取消注释并填写以下信息：
+      # - S3_ENDPOINT=https://s3.您的服务商.com
+      # - S3_ACCESS_KEY=您的AccessKey
+      # - S3_SECRET_KEY=您的SecretKey
+      # - S3_BUCKET=您的存储桶名称
+      # - S3_REGION=us-east-1
+      # - S3_PATH=ubuntu-backup
+    
+    # 由于我们使用网盘做持久化，无需映射本地存储卷(volumes)
+    # 容器拥有极高的可移植性，随时销毁重建均不会丢失数据
