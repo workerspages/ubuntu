@@ -15,7 +15,7 @@ ENV CUSTOM_USER="admin"
 ENV CUSTOM_PASSWORD="你的复杂密码"
 
 # 更新软件源并安装中文语言包、字体以及核心工具 
-# (新增 socat 工具，用于实现 README 中要求的 8080 端口映射)
+# (包含 socat 工具，用于实现 8080 端口映射)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
@@ -40,7 +40,7 @@ RUN apt-get update && \
 # 设置工作目录
 WORKDIR /workspace
 
-# 对外暴露 README 中约定的服务端端口
+# 对外暴露服务端端口
 EXPOSE 8080
 
 # 核心魔法：生成启动与 S3/WebDAV 自动同步脚本
@@ -95,18 +95,18 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 3. 容器启动时恢复历史数据'; \
+    echo '# 3. 容器启动时恢复历史数据 (已增加 --config 显式指定配置路径)'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
     echo '    echo "正在从 $TARGET_REMOTE 恢复数据到 /config..."'; \
-    echo '    rclone copy "$TARGET_REMOTE" /config --ignore-errors'; \
+    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" --ignore-errors'; \
     echo '    '; \
-    echo '    # 4. 启动后台守护进程，执行自动同步'; \
+    echo '    # 4. 启动后台守护进程，执行自动同步 (已增加 --config 显式指定配置路径)'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
     echo '    ('; \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
     echo '            echo "[$(date)] 开始后台自动同步 /config 到 $TARGET_REMOTE..."'; \
-    echo '            rclone sync /config "$TARGET_REMOTE" --ignore-errors'; \
+    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" --ignore-errors'; \
     echo '            echo "[$(date)] 同步完成"'; \
     echo '        done'; \
     echo '    ) &'; \
