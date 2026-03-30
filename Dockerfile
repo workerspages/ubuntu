@@ -1,46 +1,34 @@
-# 使用 LinuxServer 团队维护的 Ubuntu XFCE 桌面镜像作为基础
-FROM lscr.io/linuxserver/webtop:ubuntu-xfce
+# 使用 accetto 的 Ubuntu XFCE Firefox G3 镜像作为基础
+FROM accetto/ubuntu-vnc-xfce-firefox-g3:latest
 
-# 设置环境变量，配置中文本地化、时区及权限参数
-ENV PUID=1000
-ENV PGID=1000
+# 切换到 root 用户以安装必要的系统环境和工具
+USER 0
+
+# 安装中文语言包、中文字体以及 rclone (curl, wget, vim, unzip, firefox 等均已内置)
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        language-pack-zh-hans \
+        fonts-wqy-zenhei \
+        fonts-wqy-microhei \
+        fonts-noto-cjk \
+        rclone && \
+    # 生成并应用中文 locale
+    locale-gen zh_CN.UTF-8 && \
+    update-locale LANG=zh_CN.UTF-8 && \
+    # 清理 APT 缓存，减少最终镜像的体积
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 设置环境变量，配置中文本地化及桌面参数
 ENV TZ=Asia/Shanghai
 ENV LANG=zh_CN.UTF-8
 ENV LANGUAGE=zh_CN:zh
 ENV LC_ALL=zh_CN.UTF-8
 
-# 设置自定义的登录账号
-ENV CUSTOM_USER="admin"
-# 使用自定义变量名来设置密码，避开 PaaS 平台的变量冲突
+# accetto 镜像默认使用 VNC_PW 控制桌面密码
+ENV VNC_PW="你的复杂密码"
+# 兼容您之前在 PaaS 平台上设定的自定义密码变量名
 ENV CUSTOM_PASSWORD="你的复杂密码"
-
-# 更新软件源并安装中文语言包、字体以及核心工具 
-# (已移除 socat，恢复使用原生端口以保障 WebSocket 稳定)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        language-pack-zh-hans \
-        fonts-wqy-zenhei \
-        fonts-wqy-microhei \
-        fonts-noto-cjk \
-        curl \
-        wget \
-        vim \
-        git \
-        unzip \
-        tar \
-        rclone && \
-    # 生成并应用中文 locale
-    locale-gen zh_CN.UTF-8 && \
-    update-locale LANG=zh_CN.UTF-8 && \
-    # 清理 APT 缓存，减少最终镜像的大小
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# 设置工作目录
-WORKDIR /workspace
-
-# 恢复使用默认的 3000 端口，这对 WebSocket 长连接最稳定
-EXPOSE 3000
 
 # 核心魔法：生成启动与 S3/WebDAV 自动同步脚本
 RUN { \
@@ -48,9 +36,12 @@ RUN { \
     echo ''; \
     echo 'echo "=== 初始化 S3/WebDAV 数据持久化流程 ==="'; \
     echo ''; \
+    echo '# accetto 镜像的用户数据统一位于 /home/headless'; \
+    echo 'HOME_DIR="/home/headless"'; \
+    echo ''; \
     echo '# 1. 动态生成 Rclone 配置文件'; \
-    echo 'mkdir -p /root/.config/rclone'; \
-    echo 'CONF_FILE="/root/.config/rclone/rclone.conf"'; \
+    echo 'mkdir -p $HOME_DIR/.config/rclone'; \
+    echo 'CONF_FILE="$HOME_DIR/.config/rclone/rclone.conf"'; \
     echo '> "$CONF_FILE"'; \
     echo ''; \
     echo 'BASE_REMOTE=""'; \
@@ -94,41 +85,54 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 定义需要排除的系统核心缓存和运行时文件 (极度重要，防止黑屏和 WS 断开)'; \
-    echo 'EXCLUDES="--exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.config/pulse/** --exclude=/.config/kasmvnc.yaml --exclude=/.local/state/**"'; \
+    echo '# 定义需要排除的系统核心缓存和运行时文件 (防止破坏桌面环境)'; \
+    echo 'EXCLUDES="--exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
     echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
     echo '    echo "初始化检测远端目录是否存在 (避免首次运行报错)..."'; \
     echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
     echo '    '; \
-    echo '    echo "正在从 $TARGET_REMOTE 恢复核心配置数据到 /config..."'; \
-    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" $EXCLUDES --ignore-errors'; \
+    echo '    echo "正在从 $TARGET_REMOTE 恢复核心配置数据到 $HOME_DIR..."'; \
+    echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $EXCLUDES --ignore-errors'; \
     echo '    '; \
     echo '    # 4. 启动后台守护进程，执行自动同步'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
     echo '    ('; \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
-    echo '            echo "[$(date)] 开始后台自动同步 /config 到 $TARGET_REMOTE..."'; \
-    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" $EXCLUDES --ignore-errors > /dev/null 2>&1'; \
+    echo '            echo "[$(date)] 开始后台自动同步 $HOME_DIR 到 $TARGET_REMOTE..."'; \
+    echo '            rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $EXCLUDES --ignore-errors > /dev/null 2>&1'; \
     echo '        done'; \
     echo '    ) &'; \
     echo 'else'; \
     echo '    echo "⚠️ 未配置有效的 STORAGE_TYPE (s3/webdav)，跳过数据恢复与自动同步。"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 权限修复兜底，防止残留文件导致权限错乱'; \
-    echo 'chown -R $PUID:$PGID /config'; \
-    echo 'rm -rf /config/.vnc/*.pid /config/.X*-lock /tmp/.X11-unix 2>/dev/null'; \
+    echo '# 自动清理可能残留的桌面锁文件，防止 Web 桌面启动死锁'; \
+    echo 'rm -rf $HOME_DIR/.vnc/*.pid $HOME_DIR/.X*-lock /tmp/.X11-unix 2>/dev/null'; \
     echo ''; \
-    echo '# 将我们的 CUSTOM_PASSWORD 赋值给 webtop 默认识别的 PASSWORD'; \
-    echo 'export PASSWORD=$CUSTOM_PASSWORD'; \
+    echo '# 自动将您的 CUSTOM_PASSWORD 转换为 accetto 原生的 VNC_PW'; \
+    echo 'if [ -n "$CUSTOM_PASSWORD" ] && [ "$CUSTOM_PASSWORD" != "你的复杂密码" ]; then'; \
+    echo '    export VNC_PW=$CUSTOM_PASSWORD'; \
+    echo 'fi'; \
     echo ''; \
-    echo '# 5. 接管并启动 webtop 默认环境主程序 (不再使用 socat 转发)'; \
+    echo '# 5. 接管并启动 accetto 默认桌面环境主程序'; \
     echo 'echo "拉起 Ubuntu Web 桌面..."'; \
-    echo 'exec /init'; \
+    echo 'exec /dockerstartup/startup.sh "$@"'; \
 } > /sync-and-start.sh && chmod +x /sync-and-start.sh
 
-# 覆盖默认启动入口，注入完整生命周期管理脚本
-ENTRYPOINT ["/sync-and-start.sh"]
+# 切换回 accetto 镜像内定的普通安全用户 (headless)
+USER headless
+
+# 设置工作目录
+WORKDIR /home/headless
+
+# accetto 默认通过 6901 端口提供 noVNC (网页) 服务
+EXPOSE 6901
+
+# 使用 tini 接管进程并执行我们的同步与拉起脚本
+ENTRYPOINT ["/usr/bin/tini", "--", "/sync-and-start.sh"]
+
+# 默认参数，指示 accetto 保持 UI 服务常驻
+CMD ["--wait"]
