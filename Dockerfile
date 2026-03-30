@@ -100,16 +100,18 @@ RUN { \
     echo '    echo "初始化检测远端目录是否存在 (避免首次运行报错)..."'; \
     echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
     echo '    '; \
-    echo '    echo "正在从 $TARGET_REMOTE 恢复核心配置数据到 $HOME_DIR..."'; \
+    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 正在从 $TARGET_REMOTE 恢复核心配置数据到 $HOME_DIR..."'; \
     echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $EXCLUDES --ignore-errors'; \
+    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 恢复数据完毕。"'; \
     echo '    '; \
     echo '    # 4. 启动后台守护进程，执行自动同步'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
     echo '    ('; \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
-    echo '            echo "[$(date)] 开始后台自动同步 $HOME_DIR 到 $TARGET_REMOTE..."'; \
+    echo '            echo "[$(date "+%Y-%m-%d %H:%M:%S")] 开始后台自动同步 $HOME_DIR 到 $TARGET_REMOTE..."'; \
     echo '            rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $EXCLUDES --ignore-errors > /dev/null 2>&1'; \
+    echo '            echo "[$(date "+%Y-%m-%d %H:%M:%S")] 同步完成。"'; \
     echo '        done'; \
     echo '    ) &'; \
     echo 'else'; \
