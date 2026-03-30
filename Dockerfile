@@ -101,7 +101,13 @@ RUN { \
     echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
     echo '    '; \
     echo '    echo "正在从 $TARGET_REMOTE 恢复数据到 /config..."'; \
-    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" --ignore-errors'; \
+    echo '    # 增加 --exclude 防止拉取没用的缓存和桌面锁文件'; \
+    echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" \'; \
+    echo '        --exclude ".cache/**" \'; \
+    echo '        --exclude ".vnc/*.pid" \'; \
+    echo '        --exclude ".vnc/*.log" \'; \
+    echo '        --exclude ".X*-lock" \'; \
+    echo '        --ignore-errors'; \
     echo '    '; \
     echo '    # 4. 启动后台守护进程，执行自动同步'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
@@ -109,13 +115,28 @@ RUN { \
     echo '        while true; do'; \
     echo '            sleep $((INTERVAL * 60))'; \
     echo '            echo "[$(date)] 开始后台自动同步 /config 到 $TARGET_REMOTE..."'; \
-    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" --ignore-errors'; \
-    echo '            echo "[$(date)] 同步完成"'; \
+    echo '            rclone sync /config "$TARGET_REMOTE" --config="$CONF_FILE" \'; \
+    echo '                --exclude ".cache/**" \'; \
+    echo '                --exclude ".vnc/*.pid" \'; \
+    echo '                --exclude ".vnc/*.log" \'; \
+    echo '                --exclude ".X*-lock" \'; \
+    echo '                --ignore-errors > /dev/null 2>&1'; \
     echo '        done'; \
     echo '    ) &'; \
     echo 'else'; \
     echo '    echo "⚠️ 未配置有效的 STORAGE_TYPE (s3/webdav)，跳过数据恢复与自动同步。"'; \
     echo 'fi'; \
+    echo ''; \
+    echo '# ================== 核心修复逻辑 =================='; \
+    echo 'echo "清理可能导致桌面启动失败的临时锁文件和缓存..."'; \
+    echo 'rm -rf /config/.vnc/*.pid /config/.vnc/*.log /config/.X*-lock /config/.X11-unix /config/.cache /config/.dbus /tmp/.X11-unix'; \
+    echo ''; \
+    echo 'echo "修复 /config 与系统目录权限..."'; \
+    echo 'chown -R $PUID:$PGID /config'; \
+    echo 'mkdir -p /tmp/.X11-unix'; \
+    echo 'chmod 1777 /tmp/.X11-unix'; \
+    echo 'chmod 1777 /tmp'; \
+    echo '# =================================================='; \
     echo ''; \
     echo '# 将我们的 CUSTOM_PASSWORD 赋值给 webtop 默认识别的 PASSWORD'; \
     echo 'export PASSWORD=$CUSTOM_PASSWORD'; \
