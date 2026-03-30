@@ -95,12 +95,15 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 3. 容器启动时恢复历史数据 (已增加 --config 显式指定配置路径)'; \
+    echo '# 3. 容器启动时恢复历史数据'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
+    echo '    echo "初始化检测远端目录是否存 (避免首次运行报错)..."'; \
+    echo '    rclone mkdir "$TARGET_REMOTE" --config="$CONF_FILE" 2>/dev/null'; \
+    echo '    '; \
     echo '    echo "正在从 $TARGET_REMOTE 恢复数据到 /config..."'; \
     echo '    rclone copy "$TARGET_REMOTE" /config --config="$CONF_FILE" --ignore-errors'; \
     echo '    '; \
-    echo '    # 4. 启动后台守护进程，执行自动同步 (已增加 --config 显式指定配置路径)'; \
+    echo '    # 4. 启动后台守护进程，执行自动同步'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-5}'; \
     echo '    ('; \
     echo '        while true; do'; \
