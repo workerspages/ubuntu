@@ -92,8 +92,8 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 定义 Rclone 核心参数 (-L 处理软链接，排除底层缓存防止桌面破坏)'; \
-    echo 'RCLONE_OPTS="-L --exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
+    echo '# 【核心修复】定义 Rclone 核心参数：新增剔除 Firefox 的锁文件和临时数据库缓存，防止书签库损坏'; \
+    echo 'RCLONE_OPTS="-L --exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/** --exclude=/.mozilla/firefox/**/lock --exclude=/.mozilla/firefox/**/.parentlock --exclude=/.mozilla/firefox/**/places.sqlite-wal --exclude=/.mozilla/firefox/**/places.sqlite-shm"'; \
     echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
     echo 'if [ -n "$TARGET_REMOTE" ]; then'; \
@@ -139,8 +139,16 @@ RUN { \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ⚠️ 收到容器关闭/重启信号！"'; \
     echo '    '; \
     echo '    echo "第一步: 优雅关闭 Firefox 浏览器，强制将书签与历史记录从内存完整写入 SQLite 数据库..."'; \
-    echo '    pkill -15 firefox || true'; \
-    echo '    sleep 3  # 给 Firefox 留出 3 秒钟的落盘和合并 WAL 缓存文件的时间'; \
+    echo '    pkill -15 -f firefox || true'; \
+    echo '    '; \
+    echo '    # 【核心修复】动态侦测，等待 Firefox 进程彻底退出，确保数据库已安全解开锁定并闭合'; \
+    echo '    for i in {1..10}; do'; \
+    echo '        if ! pgrep -f firefox > /dev/null; then'; \
+    echo '            break'; \
+    echo '        fi'; \
+    echo '        sleep 1'; \
+    echo '    done'; \
+    echo '    echo "Firefox 进程已安全结束，书签落盘完毕。"'; \
     echo '    '; \
     echo '    echo "第二步: 优雅关闭桌面环境..."'; \
     echo '    pkill -15 xfce4-session || true'; \
