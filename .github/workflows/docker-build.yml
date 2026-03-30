@@ -31,13 +31,25 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
+          # GITHUB_TOKEN 是 GitHub Actions 自动生成的，无需手动配置
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 登录到 Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          # 需要在 GitHub 仓库的 Secrets 中配置这两个变量
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 提取 Docker 镜像的元数据 (标签和标签)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          # 同时指定 GHCR 和 Docker Hub 的镜像路径 (按您的 README 使用了 ubuntu-oss 作为镜像名)
+          images: |
+            ghcr.io/${{ github.repository }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ubuntu-oss
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
