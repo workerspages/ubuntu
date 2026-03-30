@@ -19,7 +19,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 提前赋予主目录最高读写权限，并移交所有权 (UID 1001)，彻底防止 rclone 写入或修改时间戳失败
+# 提前赋予主目录最高读写权限，并移交所有权 (UID 1001)，彻底防止 rclone 写入失败
 RUN chmod 777 /tmp && \
     mkdir -p /home/headless/.config && \
     chown -R 1001:0 /home/headless && \
@@ -92,7 +92,7 @@ RUN { \
     echo '    TARGET_REMOTE="secure:"'; \
     echo 'fi'; \
     echo ''; \
-    echo '# 定义 Rclone 核心参数 (-L 处理软链接，并排除系统核心缓存防止破坏桌面环境)'; \
+    echo '# 定义 Rclone 核心参数 (-L 处理软链接，排除底层缓存防止桌面破坏)'; \
     echo 'RCLONE_OPTS="-L --exclude=/.vnc/** --exclude=/.cache/** --exclude=/.dbus/** --exclude=/log/** --exclude=/.X*-lock --exclude=/.X11-unix/** --exclude=/.ICEauthority --exclude=/.Xauthority --exclude=/.local/state/**"'; \
     echo ''; \
     echo '# 3. 容器启动时恢复历史数据'; \
@@ -104,7 +104,7 @@ RUN { \
     echo '    rclone copy "$TARGET_REMOTE" $HOME_DIR --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors'; \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] 恢复数据完毕。"'; \
     echo '    '; \
-    echo '    # 4. 启动后台守护进程，执行自动同步 (间隔缩短为 2 分钟)'; \
+    echo '    # 4. 启动后台守护进程，执行自动同步 (间隔默认 2 分钟)'; \
     echo '    INTERVAL=${SYNC_INTERVAL:-2}'; \
     echo '    ('; \
     echo '        while true; do'; \
@@ -137,15 +137,20 @@ RUN { \
     echo 'shutdown_handler() {'; \
     echo '    echo "=================================================="'; \
     echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ⚠️ 收到容器关闭/重启信号！"'; \
-    echo '    echo "第一步: 安全关闭桌面与浏览器，强制将内存书签与缓存写入磁盘..."'; \
-    echo '    kill -TERM $VNC_PID 2>/dev/null'; \
-    echo '    wait $VNC_PID'; \
     echo '    '; \
-    echo '    echo "第二步: 执行最终强制数据同步，将最新状态毫无遗漏地推送到网盘..."'; \
+    echo '    echo "第一步: 优雅关闭 Firefox 浏览器，强制将书签与历史记录从内存完整写入 SQLite 数据库..."'; \
+    echo '    pkill -15 firefox || true'; \
+    echo '    sleep 3  # 给 Firefox 留出 3 秒钟的落盘和合并 WAL 缓存文件的时间'; \
+    echo '    '; \
+    echo '    echo "第二步: 优雅关闭桌面环境..."'; \
+    echo '    pkill -15 xfce4-session || true'; \
+    echo '    sleep 2'; \
+    echo '    '; \
+    echo '    echo "第三步: 执行最终强制数据同步，将最新状态毫无遗漏地推送到网盘..."'; \
     echo '    if [ -n "$TARGET_REMOTE" ]; then'; \
     echo '        rclone sync $HOME_DIR "$TARGET_REMOTE" --config="$CONF_FILE" $RCLONE_OPTS --ignore-errors'; \
     echo '    fi'; \
-    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ✅ 最终同步完美完成，数据绝对安全，容器允许退出。"'; \
+    echo '    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ✅ 最终同步完美完成，书签与数据绝对安全，容器允许退出。"'; \
     echo '    echo "=================================================="'; \
     echo '    exit 0'; \
     echo '}'; \
