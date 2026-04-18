@@ -1,5 +1,5 @@
 
-# 云端 Ubuntu 桌面环境 - S3/WebDAV 数据持久化版 (PaaS 部署专用)
+# 云端 Ubuntu 桌面环境 - S3/WebDAV 数据持久化版 (PaaS 部署专用) 
 
 这是一个基于轻量级、高性能的 `accetto/ubuntu-vnc-xfce-firefox-g3:latest` 构建的云端纯正 Ubuntu 桌面工作站。本项目针对现代无状态 PaaS 平台（如 Zeabur、Railway、Render、Koyeb 等）进行了深度优化，原生内置 Firefox 浏览器，支持将系统配置和桌面数据**加密**后自动同步到 **S3 存储桶** 或 **WebDAV 网盘**，彻底解决云端容器重启导致数据丢失的问题。
 
