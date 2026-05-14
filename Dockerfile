@@ -4,14 +4,19 @@ FROM accetto/ubuntu-vnc-xfce-firefox-g3:latest
 # 切换到 root 用户以安装必要的系统环境和工具
 USER 0
 
-# 安装中文语言包、中文字体以及 rclone
+# 安装中文语言包、中文字体、rclone，以及 sudo 和 python 相关依赖
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         language-pack-zh-hans \
         fonts-wqy-zenhei \
         fonts-wqy-microhei \
         fonts-noto-cjk \
-        rclone && \
+        rclone \
+        sudo \
+        python3-requests \
+        python3-bs4 && \
+    # 赋予 headless 用户免密 sudo 权限，方便后续在桌面终端内提权
+    echo "headless ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     # 生成并应用中文 locale
     locale-gen zh_CN.UTF-8 && \
     update-locale LANG=zh_CN.UTF-8 && \
